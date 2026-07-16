@@ -136,7 +136,7 @@ describe('Video Streamer Service', () => {
     const mockStream = new Readable();
     mockStream._read = () => {};
     // Mock pipe to avoid errors and let us trigger error manually
-    mockStream.pipe = () => mockStream;
+    (mockStream as any).pipe = () => mockStream;
 
     vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any);
 
@@ -175,7 +175,7 @@ describe('Video Streamer Service', () => {
 
     const mockStream = new Readable();
     mockStream._read = () => {};
-    mockStream.pipe = () => mockStream;
+    (mockStream as any).pipe = () => mockStream;
 
     vi.spyOn(fs, 'createReadStream').mockReturnValue(mockStream as any);
 
