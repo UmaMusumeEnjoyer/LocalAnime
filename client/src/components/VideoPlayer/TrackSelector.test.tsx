@@ -67,4 +67,33 @@ describe('TrackSelector Component', () => {
     fireEvent.click(screen.getByRole('button', { name: /Đóng/i }));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('renders subtitle timing control when offset and handlers are provided', () => {
+    const onAdjustOffset = vi.fn();
+    const onResetOffset = vi.fn();
+
+    render(
+      <TrackSelector
+        subtitles={mockSubtitles}
+        selectedSubtitleId="2"
+        audioTracks={mockAudioTracks}
+        selectedAudioIndex={1}
+        onSelectSubtitle={vi.fn()}
+        onSelectAudio={vi.fn()}
+        onClose={vi.fn()}
+        offset={0.8}
+        onAdjustOffset={onAdjustOffset}
+        onResetOffset={onResetOffset}
+      />
+    );
+
+    expect(screen.getByText('Đồng Bộ Phụ Đề')).toBeInTheDocument();
+    expect(screen.getByText('Lệch: +0.8s')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('+0.1s'));
+    expect(onAdjustOffset).toHaveBeenCalledWith(0.1);
+
+    fireEvent.click(screen.getByText('Reset'));
+    expect(onResetOffset).toHaveBeenCalled();
+  });
 });

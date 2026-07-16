@@ -1,5 +1,6 @@
 import styles from './TrackSelector.module.css';
 import { X, Check } from 'lucide-react';
+import SubtitleTimingControl from './SubtitleTimingControl.tsx';
 
 export interface SubtitleOption {
   id: string;
@@ -24,6 +25,9 @@ interface TrackSelectorProps {
   onSelectSubtitle: (sub: SubtitleOption) => void;
   onSelectAudio: (index: number) => void;
   onClose: () => void;
+  offset?: number;
+  onAdjustOffset?: (amount: number) => void;
+  onResetOffset?: () => void;
 }
 
 export default function TrackSelector({
@@ -34,6 +38,9 @@ export default function TrackSelector({
   onSelectSubtitle,
   onSelectAudio,
   onClose,
+  offset,
+  onAdjustOffset,
+  onResetOffset,
 }: TrackSelectorProps) {
   return (
     <div className={styles.backdrop} onClick={onClose}>
@@ -66,6 +73,17 @@ export default function TrackSelector({
               })}
             </div>
           </section>
+
+          {selectedSubtitleId !== 'none' && offset !== undefined && onAdjustOffset && onResetOffset && (
+            <section className={styles.section}>
+              <h4 className={styles.sectionTitle}>Đồng Bộ Phụ Đề</h4>
+              <SubtitleTimingControl
+                offset={offset}
+                onAdjust={onAdjustOffset}
+                onReset={onResetOffset}
+              />
+            </section>
+          )}
 
           <section className={styles.section}>
             <h4 className={styles.sectionTitle}>Chọn Âm Thanh</h4>

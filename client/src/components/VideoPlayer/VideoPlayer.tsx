@@ -8,6 +8,7 @@ import type { SubtitleCue } from '../../services/subtitleParser.ts';
 import SubtitleOverlay from './SubtitleOverlay.tsx';
 import TrackSelector from './TrackSelector.tsx';
 import type { SubtitleOption, AudioTrackOption } from './TrackSelector.tsx';
+import { useSubtitleTiming } from '../../hooks/useSubtitleTiming.ts';
 
 export default function VideoPlayer() {
   const { currentVideo, setCurrentVideo, updatePlaybackHistory, getPlaybackHistory } = usePlayerStore();
@@ -32,6 +33,8 @@ export default function VideoPlayer() {
   const [showSettings, setShowSettings] = useState(false);
   const [cues, setCues] = useState<SubtitleCue[]>([]);
   const [targetSeekTime, setTargetSeekTime] = useState<number | null>(null);
+
+  const { offset, adjustOffset, resetOffset } = useSubtitleTiming(currentVideo?.id || '', selectedSubtitleId);
 
   const lastTap = useRef({ time: 0 });
   const controlsTimeoutRef = useRef<number | null>(null);
@@ -122,6 +125,9 @@ export default function VideoPlayer() {
             subUrl: subUrl,
             workerUrl: '/jassub/jassub-worker.js',
           });
+          if (offset !== 0) {
+            jassubInstanceRef.current.setDelay(offset);
+          }
         } catch (err) {
           console.error('Failed to initialize JASSUB:', err);
         }
@@ -144,6 +150,12 @@ export default function VideoPlayer() {
       }
     };
   }, [selectedSubtitleId, subtitles, currentVideo]);
+
+  useEffect(() => {
+    if (jassubInstanceRef.current) {
+      jassubInstanceRef.current.setDelay(offset);
+    }
+  }, [offset]);
 
   if (!currentVideo) return null;
 
@@ -301,7 +313,7 @@ export default function VideoPlayer() {
         
         <canvas ref={canvasRef} className={styles.canvas} />
 
-        <SubtitleOverlay currentTime={currentTime} cues={cues} />
+        <SubtitleOverlay currentTime={currentTime} cues={cues} offset={offset} />
 
         {feedbackText && (
           <div className={styles.feedback}>
@@ -399,6 +411,9 @@ export default function VideoPlayer() {
           onSelectSubtitle={(sub) => setSelectedSubtitleId(sub.id)}
           onSelectAudio={handleSelectAudio}
           onClose={() => setShowSettings(false)}
+          offset={offset}
+          onAdjustOffset={adjustOffset}
+          onResetOffset={resetOffset}
         />
       )}
     </div>

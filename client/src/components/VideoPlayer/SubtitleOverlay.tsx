@@ -4,11 +4,13 @@ import type { SubtitleCue } from '../../services/subtitleParser.ts';
 interface SubtitleOverlayProps {
   currentTime: number;
   cues: SubtitleCue[];
+  offset?: number;
 }
 
-export default function SubtitleOverlay({ currentTime, cues }: SubtitleOverlayProps) {
+export default function SubtitleOverlay({ currentTime, cues, offset = 0 }: SubtitleOverlayProps) {
+  const adjustedTime = currentTime + offset;
   const activeCue = cues.find(
-    (cue) => currentTime >= cue.startTime && currentTime <= cue.endTime
+    (cue) => adjustedTime >= cue.startTime && adjustedTime <= cue.endTime
   );
 
   if (!activeCue) return null;
