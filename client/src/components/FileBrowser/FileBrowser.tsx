@@ -2,10 +2,16 @@ import { useState } from 'react';
 import { usePlayerStore } from '../../store/playerStore.ts';
 import VideoCard from './VideoCard.tsx';
 import styles from './FileBrowser.module.css';
-import { Search, Folder } from 'lucide-react';
+import { Search, Folder, Settings } from 'lucide-react';
 import type { VideoFile } from '../../types/video.ts';
+import SkeletonCard from './SkeletonCard.tsx';
 
-export default function FileBrowser() {
+interface FileBrowserProps {
+  onOpenSettings?: () => void;
+  isLoading?: boolean;
+}
+
+export default function FileBrowser({ onOpenSettings, isLoading = false }: FileBrowserProps) {
   const { videos, setCurrentVideo } = usePlayerStore();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -33,20 +39,35 @@ export default function FileBrowser() {
     <div className={styles.container}>
       <header className={styles.header}>
         <h1 className={styles.logo}>AnimePlayerLocal</h1>
-        <div className={styles.searchWrapper}>
-          <Search className={styles.searchIcon} size={20} />
-          <input
-            type="text"
-            className={styles.searchInput}
-            placeholder="Tìm kiếm video..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        <div className={styles.headerActions}>
+          <div className={styles.searchWrapper}>
+            <Search className={styles.searchIcon} size={20} />
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Tìm kiếm video..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <button
+            className={styles.settingsButton}
+            onClick={onOpenSettings}
+            aria-label="Cài đặt"
+          >
+            <Settings size={22} />
+          </button>
         </div>
       </header>
 
       <main className={styles.main}>
-        {filteredVideos.length === 0 ? (
+        {isLoading ? (
+          <div className={styles.grid}>
+            {Array.from({ length: 6 }).map((_, index) => (
+              <SkeletonCard key={index} />
+            ))}
+          </div>
+        ) : filteredVideos.length === 0 ? (
           <div className={styles.emptyState}>
             Không tìm thấy video nào. Vui lòng kiểm tra lại cấu hình thư mục.
           </div>

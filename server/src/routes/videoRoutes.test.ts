@@ -9,6 +9,10 @@ import * as config from '../config/index.js';
 import ffmpeg from 'fluent-ffmpeg';
 
 vi.mock('fluent-ffmpeg');
+vi.mock('../services/networkInfo.js', () => ({
+  getLocalIp: vi.fn().mockReturnValue('192.168.1.100'),
+  generateQrCodeDataUrl: vi.fn().mockResolvedValue('data:image/png;base64,mockqr'),
+}));
 
 describe('Video Routes Integration', () => {
   let testApp: express.Application;
@@ -136,5 +140,39 @@ describe('Video Routes Integration', () => {
 
     const response = await request(testApp).get('/api/videos/someid/stream');
     expect(response.status).toBe(500);
+  });
+
+  it('GET /api/config should return active configuration', async () => {
+    const mockConf = { videoDir: '/videos', subtitleDir: '/subs', port: 3000 };
+    vi.spyOn(config, 'getConfig').mockReturnValue(mockConf);
+
+    const response = await request(testApp).get('/api/config');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(mockConf);
+  });
+
+  it('POST /api/config should update configuration and write to file', async () => {
+    const mockUpdated = { videoDir: '/new-videos', subtitleDir: '/new-subs', port: 3000 };
+    const updateSpy = vi.spyOn(config, 'updateConfig').mockReturnValue(mockUpdated);
+
+    const response = await request(testApp)
+      .post('/api/config')
+      .send({ videoDir: '/new-videos', subtitleDir: '/new-subs' });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(mockUpdated);
+    expect(updateSpy).toHaveBeenCalledWith({ videoDir: '/new-videos', subtitleDir: '/new-subs' });
+  });
+
+  it('GET /api/network should return IP, port, and QR data URL', async () => {
+    vi.spyOn(config, 'getConfig').mockReturnValue({ videoDir: '/videos', subtitleDir: '', port: 3000 });
+
+    const response = await request(testApp).get('/api/network');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      localIp: '192.168.1.100',
+      port: 3000,
+      qrCodeDataUrl: 'data:image/png;base64,mockqr',
+    });
   });
 });

@@ -11,7 +11,7 @@ import type { SubtitleOption, AudioTrackOption } from './TrackSelector.tsx';
 import { useSubtitleTiming } from '../../hooks/useSubtitleTiming.ts';
 
 export default function VideoPlayer() {
-  const { currentVideo, setCurrentVideo, updatePlaybackHistory, getPlaybackHistory } = usePlayerStore();
+  const { videos, currentVideo, setCurrentVideo, updatePlaybackHistory, getPlaybackHistory } = usePlayerStore();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -179,6 +179,7 @@ export default function VideoPlayer() {
         if (savedTime && savedTime < videoRef.current.duration) {
           videoRef.current.currentTime = savedTime;
         }
+        videoRef.current.play().catch((err) => console.log('Autoplay error', err));
       }
     }
   };
@@ -297,6 +298,14 @@ export default function VideoPlayer() {
     }
   };
 
+  const handleEnded = () => {
+    const currentIndex = videos.findIndex((v) => v.id === currentVideo.id);
+    if (currentIndex !== -1 && currentIndex < videos.length - 1) {
+      const nextVideo = videos[currentIndex + 1];
+      setCurrentVideo(nextVideo);
+    }
+  };
+
   return (
     <div ref={containerRef} className={styles.container}>
       <div className={styles.videoWrapper} onClick={handleVideoTap}>
@@ -309,6 +318,7 @@ export default function VideoPlayer() {
           onTimeUpdate={handleTimeUpdate}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
+          onEnded={handleEnded}
         />
         
         <canvas ref={canvasRef} className={styles.canvas} />

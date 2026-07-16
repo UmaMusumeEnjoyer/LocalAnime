@@ -35,10 +35,39 @@
   text-align: left;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 450px;
+  justify-content: flex-end;
+}
+
 .searchWrapper {
   position: relative;
-  width: 100%;
-  max-width: 400px;
+  flex-grow: 1;
+}
+
+.settingsButton {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.settingsButton:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--accent-primary);
 }
 
 .searchIcon {

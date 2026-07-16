@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import path from 'path';
-import { getConfig } from '../config/index.js';
+import { getConfig, updateConfig } from '../config/index.js';
 import { scanDirectory } from '../services/fileScanner.js';
 import { streamVideo } from '../services/videoStreamer.js';
+import { getLocalIp, generateQrCodeDataUrl } from '../services/networkInfo.js';
 import ffmpeg from 'fluent-ffmpeg';
 
 const router = Router();
@@ -77,6 +78,46 @@ router.get('/videos/:id/stream', (req, res) => {
     streamVideo(absolutePath, req.headers.range, res);
   } catch (err) {
     console.error('Error in GET /videos/:id/stream', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+router.get('/config', (req, res) => {
+  try {
+    const config = getConfig();
+    res.json(config);
+  } catch (err) {
+    console.error('Error in GET /config', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+router.post('/config', (req, res) => {
+  try {
+    const { videoDir, subtitleDir } = req.body;
+    const updated = updateConfig({ videoDir, subtitleDir });
+    res.json(updated);
+  } catch (err) {
+    console.error('Error in POST /config', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+router.get('/network', async (req, res) => {
+  try {
+    const config = getConfig();
+    const localIp = getLocalIp();
+    const port = config.port;
+    const url = `http://${localIp}:${port}`;
+    const qrCodeDataUrl = await generateQrCodeDataUrl(url);
+    
+    res.json({
+      localIp,
+      port,
+      qrCodeDataUrl,
+    });
+  } catch (err) {
+    console.error('Error in GET /network', err);
     res.status(500).send('Internal Server Error');
   }
 });
