@@ -1,8 +1,16 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 dotenv.config();
+const rootEnvPath = path.resolve(__dirname, '../../../.env');
+if (fs.existsSync(rootEnvPath)) {
+  dotenv.config({ path: rootEnvPath, override: true });
+}
 
 export interface Config {
   videoDir: string;
@@ -11,8 +19,8 @@ export interface Config {
 }
 
 const DEFAULT_CONFIG: Config = {
-  videoDir: process.env.VIDEO_DIR || 'E:\\Anime',
-  subtitleDir: process.env.SUBTITLE_DIR || 'E:\\Anime\\Sub',
+  videoDir: process.env.VIDEO_DIR || '',
+  subtitleDir: process.env.SUBTITLE_DIR || '',
   port: Number(process.env.PORT) || 3000,
 };
 

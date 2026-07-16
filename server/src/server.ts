@@ -1,8 +1,18 @@
 import app from './app.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import { getLocalIp, printTerminalQr } from './services/networkInfo.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 dotenv.config();
+const rootEnvPath = path.resolve(__dirname, '../../.env');
+if (fs.existsSync(rootEnvPath)) {
+  dotenv.config({ path: rootEnvPath, override: true });
+}
 
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
