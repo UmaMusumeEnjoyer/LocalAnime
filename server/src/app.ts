@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import videoRoutes from './routes/videoRoutes.js';
+import { subtitleRouter } from './routes/subtitleRoutes.js';
 
 const app = express();
 
@@ -12,5 +13,6 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api', videoRoutes);
+app.use('/api/videos', subtitleRouter);
 
 export default app;
