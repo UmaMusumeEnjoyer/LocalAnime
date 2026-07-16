@@ -10,6 +10,7 @@ describe('SubtitleScanner Service', () => {
     vi.spyOn(configModule, 'getConfig').mockReturnValue({
       videoDir: 'C:/videos',
       subtitleDir: 'C:/subtitles',
+      port: 3000,
     });
   });
 
@@ -18,6 +19,7 @@ describe('SubtitleScanner Service', () => {
       vi.spyOn(configModule, 'getConfig').mockReturnValue({
         videoDir: 'C:/videos',
         subtitleDir: '',
+        port: 3000,
       });
 
       const result = await scanExternalSubtitles('Season 1/ep01.mkv');
@@ -31,7 +33,7 @@ describe('SubtitleScanner Service', () => {
         'ep01.eng.ass',
         'ep02.ass',
         'some_other_file.txt',
-      ]);
+      ] as any);
 
       const result = await scanExternalSubtitles('Season 1/ep01.mkv');
 

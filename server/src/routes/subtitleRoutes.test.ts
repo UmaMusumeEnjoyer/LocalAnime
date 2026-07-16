@@ -30,6 +30,7 @@ describe('Subtitle Router', () => {
     vi.spyOn(configModule, 'getConfig').mockReturnValue({
       videoDir: 'C:/videos',
       subtitleDir: 'C:/subtitles',
+      port: 3000,
     });
     vi.spyOn(fileScannerModule, 'scanDirectory').mockResolvedValue([mockVideo]);
   });
