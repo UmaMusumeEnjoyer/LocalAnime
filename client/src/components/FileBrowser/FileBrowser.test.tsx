@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
-import FileBrowser from './FileBrowser';
-import { usePlayerStore } from '../../store/playerStore';
+import FileBrowser from './FileBrowser.tsx';
+import { usePlayerStore } from '../../store/playerStore.ts';
 
 describe('FileBrowser Component', () => {
   const mockVideos = [

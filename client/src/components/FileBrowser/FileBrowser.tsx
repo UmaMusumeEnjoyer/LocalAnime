@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { usePlayerStore } from '../../store/playerStore';
-import VideoCard from './VideoCard';
+import { useState } from 'react';
+import { usePlayerStore } from '../../store/playerStore.ts';
+import VideoCard from './VideoCard.tsx';
 import styles from './FileBrowser.module.css';
 import { Search, Folder } from 'lucide-react';
-import { VideoFile } from '../../types/video';
+import type { VideoFile } from '../../types/video.ts';
 
 export default function FileBrowser() {
   const { videos, setCurrentVideo } = usePlayerStore();

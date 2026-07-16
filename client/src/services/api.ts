@@ -1,4 +1,4 @@
-import { VideoFile } from '../types/video';
+import type { VideoFile } from '../types/video.ts';
 
 export async function fetchVideos(): Promise<VideoFile[]> {
   const response = await fetch('/api/videos');

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { VideoFile } from '../types/video';
+import type { VideoFile } from '../types/video.ts';
 
 interface PlayerState {
   videos: VideoFile[];

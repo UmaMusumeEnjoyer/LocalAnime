@@ -1,5 +1,5 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { usePlayerStore } from '../../store/playerStore';
+import { useRef, useState, useEffect } from 'react';
+import { usePlayerStore } from '../../store/playerStore.ts';
 import styles from './VideoPlayer.module.css';
 import { Play, Pause, ArrowLeft, Maximize, Minimize, Volume2, VolumeX } from 'lucide-react';
 

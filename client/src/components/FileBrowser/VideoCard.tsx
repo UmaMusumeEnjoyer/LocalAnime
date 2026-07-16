@@ -1,5 +1,4 @@
-import React from 'react';
-import { VideoFile } from '../../types/video';
+import type { VideoFile } from '../../types/video.ts';
 import styles from './VideoCard.module.css';
 import { Play } from 'lucide-react';
 

@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
-import VideoPlayer from './VideoPlayer';
-import { usePlayerStore } from '../../store/playerStore';
+import VideoPlayer from './VideoPlayer.tsx';
+import { usePlayerStore } from '../../store/playerStore.ts';
 
 describe('VideoPlayer Component', () => {
   const mockVideo = { id: 'abc', name: 'v1.mp4', relativePath: 'v1.mp4', size: 100 };

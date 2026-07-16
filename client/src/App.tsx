@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import { usePlayerStore } from './store/playerStore';
-import { fetchVideos } from './services/api';
-import FileBrowser from './components/FileBrowser/FileBrowser';
-import VideoPlayer from './components/VideoPlayer/VideoPlayer';
+import { usePlayerStore } from './store/playerStore.ts';
+import { fetchVideos } from './services/api.ts';
+import FileBrowser from './components/FileBrowser/FileBrowser.tsx';
+import VideoPlayer from './components/VideoPlayer/VideoPlayer.tsx';
 
 function App() {
   const { currentVideo, setVideos } = usePlayerStore();
