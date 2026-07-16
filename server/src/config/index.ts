@@ -11,8 +11,8 @@ export interface Config {
 }
 
 const DEFAULT_CONFIG: Config = {
-  videoDir: process.env.VIDEO_DIR || '',
-  subtitleDir: process.env.SUBTITLE_DIR || '',
+  videoDir: process.env.VIDEO_DIR || 'E:\\Anime',
+  subtitleDir: process.env.SUBTITLE_DIR || 'E:\\Anime\\Sub',
   port: Number(process.env.PORT) || 3000,
 };
 
