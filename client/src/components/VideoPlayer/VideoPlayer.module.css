@@ -58,6 +58,9 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  padding-left: calc(16px + env(safe-area-inset-left, 0px));
+  padding-right: calc(16px + env(safe-area-inset-right, 0px));
 }
 
 .videoTitle {
@@ -78,7 +81,12 @@
   background: var(--bg-glass);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--border);
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(16px + env(safe-area-inset-left, 0px));
+  padding-right: calc(16px + env(safe-area-inset-right, 0px));
 }
+
+/* ========== Custom Seek Bar ========== */
 
 .progressRow {
   display: flex;
@@ -91,17 +99,86 @@
   font-family: monospace;
   color: var(--text-primary);
   min-width: 44px;
+  flex-shrink: 0;
+  user-select: none;
 }
 
-.seekBar {
+.seekBarContainer {
   flex-grow: 1;
+  position: relative;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.seekBarTrack {
+  position: relative;
+  width: 100%;
   height: 6px;
   border-radius: 3px;
-  outline: none;
   background-color: var(--bg-surface);
-  cursor: pointer;
-  accent-color: var(--accent-primary);
+  overflow: visible;
+  transition: height 0.15s ease;
 }
+
+.seekBarContainer:hover .seekBarTrack,
+.seekBarContainer:active .seekBarTrack,
+.seekBarContainerSeeking .seekBarTrack {
+  height: 10px;
+  border-radius: 5px;
+}
+
+.seekBarFill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-hover));
+  pointer-events: none;
+  transition: none;
+}
+
+.seekBarThumb {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: var(--accent-primary);
+  box-shadow: 0 0 8px var(--accent-glow), 0 2px 4px rgba(0, 0, 0, 0.3);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: width 0.15s ease, height 0.15s ease;
+  z-index: 2;
+}
+
+.seekBarContainer:hover .seekBarThumb,
+.seekBarContainer:active .seekBarThumb,
+.seekBarContainerSeeking .seekBarThumb {
+  width: 24px;
+  height: 24px;
+}
+
+.seekPreview {
+  position: absolute;
+  top: -36px;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.85);
+  color: var(--text-primary);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-family: monospace;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* ========== Controls Row ========== */
 
 .controlsRow {
   display: flex;
@@ -112,7 +189,7 @@
 .controlsGroup {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
 }
 
 .iconButton {
@@ -126,14 +203,62 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.1s ease;
   outline: none;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
 }
 
 .iconButton:hover {
   background-color: rgba(255, 255, 255, 0.1);
   color: var(--accent-primary);
 }
+
+.iconButton:active {
+  transform: scale(0.9);
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* ========== Skip Buttons ========== */
+
+.skipButton {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+}
+
+.skipButton:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--accent-primary);
+}
+
+.skipButton:active {
+  transform: scale(0.9);
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.skipLabel {
+  position: absolute;
+  bottom: 2px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* ========== Volume ========== */
 
 .volumeContainer {
   display: flex;
@@ -149,6 +274,8 @@
   cursor: pointer;
   accent-color: var(--accent-primary);
 }
+
+/* ========== Feedback ========== */
 
 .feedback {
   position: absolute;
@@ -174,6 +301,8 @@
   }
 }
 
+/* ========== Canvas (JASSUB) ========== */
+
 .canvas {
   position: absolute;
   top: 0;
@@ -182,4 +311,46 @@
   height: 100%;
   pointer-events: none;
   z-index: 2;
+}
+
+/* ========== Mobile Responsive ========== */
+
+@media (max-width: 768px) {
+  .volumeContainer {
+    display: none;
+  }
+
+  .controlsGroup {
+    gap: 4px;
+  }
+
+  .iconButton {
+    width: 40px;
+    height: 40px;
+  }
+
+  .skipLabel {
+    font-size: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .topBar,
+  .bottomBar {
+    padding: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .topBar {
+    padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  }
+
+  .progressRow {
+    gap: 8px;
+  }
+
+  .timeLabel {
+    font-size: 0.75rem;
+    min-width: 38px;
+  }
 }

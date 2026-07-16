@@ -1,7 +1,7 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { usePlayerStore } from '../../store/playerStore.ts';
 import styles from './VideoPlayer.module.css';
-import { Play, Pause, ArrowLeft, Maximize, Minimize, Volume2, VolumeX, Settings } from 'lucide-react';
+import { Play, Pause, ArrowLeft, Maximize, Minimize, Volume2, VolumeX, Settings, RotateCcw, RotateCw } from 'lucide-react';
 import JASSUB from 'jassub';
 import { parseSubtitle } from '../../services/subtitleParser.ts';
 import type { SubtitleCue } from '../../services/subtitleParser.ts';
@@ -10,12 +10,19 @@ import TrackSelector from './TrackSelector.tsx';
 import type { SubtitleOption, AudioTrackOption } from './TrackSelector.tsx';
 import { useSubtitleTiming } from '../../hooks/useSubtitleTiming.ts';
 
+/** Detect mobile browser */
+const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+/** localStorage key helpers */
+const getSubtitlePrefKey = (videoId: string) => `subtitle-pref-${videoId}`;
+
 export default function VideoPlayer() {
   const { videos, currentVideo, setCurrentVideo, updatePlaybackHistory, getPlaybackHistory } = usePlayerStore();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const jassubInstanceRef = useRef<any>(null);
+  const seekBarRef = useRef<HTMLDivElement | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -34,11 +41,16 @@ export default function VideoPlayer() {
   const [cues, setCues] = useState<SubtitleCue[]>([]);
   const [targetSeekTime, setTargetSeekTime] = useState<number | null>(null);
 
+  // Custom seek bar state
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [seekPreviewTime, setSeekPreviewTime] = useState<number | null>(null);
+
   const { offset, adjustOffset, resetOffset } = useSubtitleTiming(currentVideo?.id || '', selectedSubtitleId);
 
   const lastTap = useRef({ time: 0 });
   const controlsTimeoutRef = useRef<number | null>(null);
 
+  // ─── Controls auto-hide ───────────────────────────────
   useEffect(() => {
     const resetControlsTimeout = () => {
       if (controlsTimeoutRef.current) {
@@ -67,16 +79,71 @@ export default function VideoPlayer() {
     };
   }, [isPlaying, showSettings]);
 
+  // ─── Fullscreen change listener ───────────────────────
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFS = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
+      setIsFullscreen(isFS);
+
+      // Unlock orientation when leaving fullscreen
+      if (!isFS && screen.orientation && (screen.orientation as any).unlock) {
+        try {
+          (screen.orientation as any).unlock();
+        } catch (_) { /* ignore */ }
+      }
+    };
+
+    const handleWebkitEndFullscreen = () => {
+      setIsFullscreen(false);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+    // iOS Safari: listen on video element
+    const videoEl = videoRef.current;
+    if (videoEl) {
+      videoEl.addEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
+    }
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      if (videoEl) {
+        videoEl.removeEventListener('webkitendfullscreen', handleWebkitEndFullscreen);
+      }
+    };
+  }, []);
+
+  // ─── Fetch subtitles & auto-select default ────────────
   useEffect(() => {
     if (!currentVideo) return;
 
     fetch(`/api/videos/${currentVideo.id}/subtitles`)
       .then((res) => res.json())
-      .then((data) => {
-        setSubtitles([
+      .then((data: SubtitleOption[]) => {
+        const list: SubtitleOption[] = [
           { id: 'none', name: 'Tắt phụ đề', language: '', type: 'none' },
           ...data,
-        ]);
+        ];
+        setSubtitles(list);
+
+        // Auto-select subtitle: check localStorage first, then pick default
+        const savedPref = localStorage.getItem(getSubtitlePrefKey(currentVideo.id));
+        if (savedPref && list.some((s) => s.id === savedPref)) {
+          setSelectedSubtitleId(savedPref);
+        } else if (data.length > 0) {
+          // Prioritize Vietnamese subtitle
+          const viSub = data.find(
+            (s) =>
+              s.language.toLowerCase().includes('vi') ||
+              s.name.toLowerCase().includes('vie') ||
+              s.name.toLowerCase().includes('việt')
+          );
+          const defaultSub = viSub || data[0];
+          setSelectedSubtitleId(defaultSub.id);
+          localStorage.setItem(getSubtitlePrefKey(currentVideo.id), defaultSub.id);
+        }
       })
       .catch((err) => console.error('Error fetching subtitles:', err));
 
@@ -91,6 +158,14 @@ export default function VideoPlayer() {
       .catch((err) => console.error('Error fetching audio tracks:', err));
   }, [currentVideo]);
 
+  // Save subtitle preference when user changes it
+  useEffect(() => {
+    if (currentVideo && selectedSubtitleId) {
+      localStorage.setItem(getSubtitlePrefKey(currentVideo.id), selectedSubtitleId);
+    }
+  }, [selectedSubtitleId, currentVideo]);
+
+  // ─── Subtitle rendering (JASSUB / text) ───────────────
   useEffect(() => {
     if (!currentVideo) return;
 
@@ -164,10 +239,12 @@ export default function VideoPlayer() {
       ? `/api/videos/${currentVideo.id}/stream?audioTrack=${selectedAudioIndex}`
       : `/api/videos/${currentVideo.id}/stream`;
 
+  // ─── Video event handlers ─────────────────────────────
+
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
-      
+
       if (targetSeekTime !== null) {
         videoRef.current.currentTime = targetSeekTime;
         setTargetSeekTime(null);
@@ -185,7 +262,7 @@ export default function VideoPlayer() {
   };
 
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
+    if (videoRef.current && !isSeeking) {
       const curTime = videoRef.current.currentTime;
       setCurrentTime(curTime);
       updatePlaybackHistory(currentVideo.id, curTime);
@@ -203,13 +280,75 @@ export default function VideoPlayer() {
     }
   };
 
-  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const time = parseFloat(e.target.value);
-    if (videoRef.current) {
-      videoRef.current.currentTime = time;
-      setCurrentTime(time);
+  // ─── Custom Seek Bar ──────────────────────────────────
+
+  const getSeekTimeFromEvent = (
+    e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement> | TouchEvent | MouseEvent
+  ): number => {
+    if (!seekBarRef.current) return 0;
+    const rect = seekBarRef.current.getBoundingClientRect();
+    let clientX: number;
+
+    if ('touches' in e) {
+      clientX = e.touches.length > 0 ? e.touches[0].clientX : (e as TouchEvent).changedTouches[0].clientX;
+    } else {
+      clientX = (e as MouseEvent).clientX;
     }
+
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return ratio * (duration || 0);
   };
+
+  const handleSeekStart = (e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    setIsSeeking(true);
+    const time = getSeekTimeFromEvent(e);
+    setSeekPreviewTime(time);
+    setCurrentTime(time);
+  };
+
+  const handleSeekMove = useCallback(
+    (e: TouchEvent | MouseEvent) => {
+      if (!isSeeking) return;
+      e.preventDefault();
+      const time = getSeekTimeFromEvent(e);
+      setSeekPreviewTime(time);
+      setCurrentTime(time);
+    },
+    [isSeeking, duration]
+  );
+
+  const handleSeekEnd = useCallback(
+    (e: TouchEvent | MouseEvent) => {
+      if (!isSeeking) return;
+      const time = getSeekTimeFromEvent(e);
+      if (videoRef.current) {
+        videoRef.current.currentTime = time;
+      }
+      setCurrentTime(time);
+      setIsSeeking(false);
+      setSeekPreviewTime(null);
+    },
+    [isSeeking, duration]
+  );
+
+  // Attach global listeners for seek move/end so dragging works even outside the bar
+  useEffect(() => {
+    if (isSeeking) {
+      window.addEventListener('touchmove', handleSeekMove, { passive: false });
+      window.addEventListener('touchend', handleSeekEnd);
+      window.addEventListener('mousemove', handleSeekMove);
+      window.addEventListener('mouseup', handleSeekEnd);
+    }
+    return () => {
+      window.removeEventListener('touchmove', handleSeekMove);
+      window.removeEventListener('touchend', handleSeekEnd);
+      window.removeEventListener('mousemove', handleSeekMove);
+      window.removeEventListener('mouseup', handleSeekEnd);
+    };
+  }, [isSeeking, handleSeekMove, handleSeekEnd]);
+
+  // ─── Volume ────────────────────────────────────────────
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
@@ -229,33 +368,79 @@ export default function VideoPlayer() {
     }
   };
 
-  const toggleFullscreen = () => {
+  // ─── Fullscreen (mobile-aware) ─────────────────────────
+
+  const toggleFullscreen = async () => {
     if (!containerRef.current) return;
 
     if (!isFullscreen) {
-      if (containerRef.current.requestFullscreen) {
-        containerRef.current.requestFullscreen();
+      // On iOS Safari, use native video fullscreen for true fullscreen
+      if (isMobile() && videoRef.current && (videoRef.current as any).webkitEnterFullscreen) {
+        try {
+          (videoRef.current as any).webkitEnterFullscreen();
+          setIsFullscreen(true);
+          return;
+        } catch (_) { /* fallback below */ }
       }
-      setIsFullscreen(true);
+
+      // Standard Fullscreen API
+      try {
+        if (containerRef.current.requestFullscreen) {
+          await containerRef.current.requestFullscreen();
+        } else if ((containerRef.current as any).webkitRequestFullscreen) {
+          await (containerRef.current as any).webkitRequestFullscreen();
+        }
+      } catch (err) {
+        console.log('Fullscreen request failed:', err);
+      }
+
+      // Lock landscape on mobile Android
+      if (isMobile() && screen.orientation && (screen.orientation as any).lock) {
+        try {
+          await (screen.orientation as any).lock('landscape');
+        } catch (_) { /* not supported or denied */ }
+      }
+
+      // State is set by the fullscreenchange listener
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
+      try {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        }
+      } catch (err) {
+        console.log('Exit fullscreen failed:', err);
       }
-      setIsFullscreen(false);
+      // State is set by the fullscreenchange listener
     }
   };
+
+  // ─── Skip (tua) ────────────────────────────────────────
+
+  const handleSkip = (seconds: number) => {
+    if (videoRef.current) {
+      const newTime = Math.max(0, Math.min(videoRef.current.duration || 0, videoRef.current.currentTime + seconds));
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
+      const sign = seconds > 0 ? '+' : '';
+      showFeedback(`${sign}${seconds}s`);
+    }
+  };
+
+  // ─── Double-tap to skip (kept as supplementary) ────────
 
   const handleVideoTap = (e: React.MouseEvent<HTMLDivElement>) => {
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300;
-    
+
     setShowControls(true);
 
     if (now - lastTap.current.time < DOUBLE_TAP_DELAY) {
       const rect = e.currentTarget.getBoundingClientRect();
       const tapX = e.clientX - rect.left;
       const width = rect.width;
-      
+
       if (videoRef.current) {
         if (tapX < width / 2) {
           videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
@@ -279,17 +464,23 @@ export default function VideoPlayer() {
 
   const formatTime = (timeInSeconds: number) => {
     if (isNaN(timeInSeconds)) return '00:00';
-    const minutes = Math.floor(timeInSeconds / 60);
+    const hours = Math.floor(timeInSeconds / 3600);
+    const minutes = Math.floor((timeInSeconds % 3600) / 60);
     const seconds = Math.floor(timeInSeconds % 60);
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
+
+  // ─── Audio track switch ────────────────────────────────
 
   const handleSelectAudio = (index: number) => {
     if (videoRef.current) {
       const curTime = videoRef.current.currentTime;
       setTargetSeekTime(curTime);
       setSelectedAudioIndex(index);
-      
+
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.load();
@@ -297,6 +488,8 @@ export default function VideoPlayer() {
       }, 50);
     }
   };
+
+  // ─── Auto-play next ────────────────────────────────────
 
   const handleEnded = () => {
     const currentIndex = videos.findIndex((v) => v.id === currentVideo.id);
@@ -306,6 +499,10 @@ export default function VideoPlayer() {
     }
   };
 
+  // ─── Computed values for seek bar ──────────────────────
+
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
   return (
     <div ref={containerRef} className={styles.container}>
       <div className={styles.videoWrapper} onClick={handleVideoTap}>
@@ -314,13 +511,14 @@ export default function VideoPlayer() {
           data-testid="video-element"
           className={styles.video}
           src={videoSrc}
+          playsInline
           onLoadedMetadata={handleLoadedMetadata}
           onTimeUpdate={handleTimeUpdate}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           onEnded={handleEnded}
         />
-        
+
         <canvas ref={canvasRef} className={styles.canvas} />
 
         <SubtitleOverlay currentTime={currentTime} cues={cues} offset={offset} />
@@ -347,19 +545,41 @@ export default function VideoPlayer() {
           </div>
 
           <div className={styles.bottomBar}>
+            {/* Custom Seek Bar */}
             <div className={styles.progressRow}>
               <span className={styles.timeLabel}>{formatTime(currentTime)}</span>
-              <input
-                type="range"
-                className={styles.seekBar}
-                min={0}
-                max={duration || 0}
-                value={currentTime}
-                onChange={handleSeekChange}
-              />
+
+              <div
+                ref={seekBarRef}
+                className={`${styles.seekBarContainer} ${isSeeking ? styles.seekBarContainerSeeking : ''}`}
+                onTouchStart={handleSeekStart}
+                onMouseDown={handleSeekStart}
+              >
+                <div className={styles.seekBarTrack}>
+                  <div
+                    className={styles.seekBarFill}
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                  <div
+                    className={styles.seekBarThumb}
+                    style={{ left: `${progressPercent}%` }}
+                  />
+                </div>
+
+                {isSeeking && seekPreviewTime !== null && (
+                  <div
+                    className={styles.seekPreview}
+                    style={{ left: `${(seekPreviewTime / (duration || 1)) * 100}%` }}
+                  >
+                    {formatTime(seekPreviewTime)}
+                  </div>
+                )}
+              </div>
+
               <span className={styles.timeLabel}>{formatTime(duration)}</span>
             </div>
 
+            {/* Controls Row */}
             <div className={styles.controlsRow}>
               <div className={styles.controlsGroup}>
                 <button
@@ -368,6 +588,40 @@ export default function VideoPlayer() {
                   onClick={togglePlay}
                 >
                   {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+                </button>
+
+                {/* Skip buttons: -10s, -5s, +5s, +10s */}
+                <button
+                  aria-label="rewind-10"
+                  className={styles.skipButton}
+                  onClick={() => handleSkip(-10)}
+                >
+                  <RotateCcw size={22} />
+                  <span className={styles.skipLabel}>10</span>
+                </button>
+                <button
+                  aria-label="rewind-5"
+                  className={styles.skipButton}
+                  onClick={() => handleSkip(-5)}
+                >
+                  <RotateCcw size={20} />
+                  <span className={styles.skipLabel}>5</span>
+                </button>
+                <button
+                  aria-label="forward-5"
+                  className={styles.skipButton}
+                  onClick={() => handleSkip(5)}
+                >
+                  <RotateCw size={20} />
+                  <span className={styles.skipLabel}>5</span>
+                </button>
+                <button
+                  aria-label="forward-10"
+                  className={styles.skipButton}
+                  onClick={() => handleSkip(10)}
+                >
+                  <RotateCw size={22} />
+                  <span className={styles.skipLabel}>10</span>
                 </button>
 
                 <div className={styles.volumeContainer}>
