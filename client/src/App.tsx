@@ -1,22 +1,21 @@
+import { useEffect } from 'react';
+import { usePlayerStore } from './store/playerStore';
+import { fetchVideos } from './services/api';
+import FileBrowser from './components/FileBrowser/FileBrowser';
+import VideoPlayer from './components/VideoPlayer/VideoPlayer';
+
 function App() {
+  const { currentVideo, setVideos } = usePlayerStore();
+
+  useEffect(() => {
+    fetchVideos()
+      .then(setVideos)
+      .catch((err) => console.error('Failed to fetch videos from server', err));
+  }, [setVideos]);
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        textAlign: 'center',
-        padding: '20px',
-      }}
-    >
-      <h1 style={{ fontSize: '2.5rem', marginBottom: '16px', color: 'var(--accent-primary)' }}>
-        AnimePlayerLocal
-      </h1>
-      <p style={{ color: 'var(--text-secondary)', maxWidth: '500px' }}>
-        Thiết lập dự án Monorepo đã hoàn tất. Frontend và Backend đang hoạt động ổn định trên môi trường thử nghiệm.
-      </p>
+    <div className="app">
+      {currentVideo ? <VideoPlayer /> : <FileBrowser />}
     </div>
   );
 }
