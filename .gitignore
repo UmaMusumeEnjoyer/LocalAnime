@@ -40,3 +40,8 @@ lerna-debug.log*
 
 # Server temporary/extracted subtitles
 server/temp/
+
+# Plan files
+PROJECT_PLAN.md
+implementation_plan.md
+
