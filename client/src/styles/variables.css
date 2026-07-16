@@ -1,0 +1,25 @@
+:root {
+  /* Dark Theme Colors */
+  --bg-primary: hsl(230, 25%, 8%);
+  --bg-secondary: hsl(230, 20%, 12%);
+  --bg-surface: hsl(230, 18%, 16%);
+  --bg-glass: hsla(230, 25%, 15%, 0.7);
+
+  --text-primary: hsl(220, 20%, 95%);
+  --text-secondary: hsl(220, 15%, 60%);
+  --text-muted: hsl(220, 10%, 40%);
+
+  --accent-primary: hsl(265, 85%, 65%);
+  --accent-hover: hsl(265, 85%, 75%);
+  --accent-glow: hsla(265, 85%, 65%, 0.3);
+
+  --success: hsl(160, 70%, 45%);
+  --warning: hsl(40, 90%, 55%);
+  --error: hsl(0, 75%, 60%);
+
+  --border: hsl(230, 15%, 20%);
+  --border-focus: hsl(265, 85%, 65%);
+
+  /* Typography */
+  --font-sans: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+}
