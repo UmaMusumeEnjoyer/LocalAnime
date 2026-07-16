@@ -1,12 +1,20 @@
 import { useRef, useState, useEffect } from 'react';
 import { usePlayerStore } from '../../store/playerStore.ts';
 import styles from './VideoPlayer.module.css';
-import { Play, Pause, ArrowLeft, Maximize, Minimize, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, ArrowLeft, Maximize, Minimize, Volume2, VolumeX, Settings } from 'lucide-react';
+import JASSUB from 'jassub';
+import { parseSubtitle } from '../../services/subtitleParser.ts';
+import type { SubtitleCue } from '../../services/subtitleParser.ts';
+import SubtitleOverlay from './SubtitleOverlay.tsx';
+import TrackSelector from './TrackSelector.tsx';
+import type { SubtitleOption, AudioTrackOption } from './TrackSelector.tsx';
 
 export default function VideoPlayer() {
   const { currentVideo, setCurrentVideo, updatePlaybackHistory, getPlaybackHistory } = usePlayerStore();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const jassubInstanceRef = useRef<any>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -16,6 +24,14 @@ export default function VideoPlayer() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [feedbackText, setFeedbackText] = useState('');
+
+  const [subtitles, setSubtitles] = useState<SubtitleOption[]>([]);
+  const [audioTracks, setAudioTracks] = useState<AudioTrackOption[]>([]);
+  const [selectedSubtitleId, setSelectedSubtitleId] = useState<string>('none');
+  const [selectedAudioIndex, setSelectedAudioIndex] = useState<number>(1);
+  const [showSettings, setShowSettings] = useState(false);
+  const [cues, setCues] = useState<SubtitleCue[]>([]);
+  const [targetSeekTime, setTargetSeekTime] = useState<number | null>(null);
 
   const lastTap = useRef({ time: 0 });
   const controlsTimeoutRef = useRef<number | null>(null);
@@ -27,7 +43,7 @@ export default function VideoPlayer() {
       }
       setShowControls(true);
       controlsTimeoutRef.current = window.setTimeout(() => {
-        if (isPlaying) {
+        if (isPlaying && !showSettings) {
           setShowControls(false);
         }
       }, 3000);
@@ -46,18 +62,111 @@ export default function VideoPlayer() {
         window.clearTimeout(controlsTimeoutRef.current);
       }
     };
-  }, [isPlaying]);
+  }, [isPlaying, showSettings]);
+
+  useEffect(() => {
+    if (!currentVideo) return;
+
+    fetch(`/api/videos/${currentVideo.id}/subtitles`)
+      .then((res) => res.json())
+      .then((data) => {
+        setSubtitles([
+          { id: 'none', name: 'Tắt phụ đề', language: '', type: 'none' },
+          ...data,
+        ]);
+      })
+      .catch((err) => console.error('Error fetching subtitles:', err));
+
+    fetch(`/api/videos/${currentVideo.id}/audio-tracks`)
+      .then((res) => res.json())
+      .then((data) => {
+        setAudioTracks(data);
+        if (data.length > 0) {
+          setSelectedAudioIndex(data[0].index);
+        }
+      })
+      .catch((err) => console.error('Error fetching audio tracks:', err));
+  }, [currentVideo]);
+
+  useEffect(() => {
+    if (!currentVideo) return;
+
+    if (jassubInstanceRef.current) {
+      jassubInstanceRef.current.destroy();
+      jassubInstanceRef.current = null;
+    }
+    setCues([]);
+
+    if (selectedSubtitleId === 'none') return;
+
+    const selectedSub = subtitles.find((s) => s.id === selectedSubtitleId);
+    if (!selectedSub) return;
+
+    const subUrl =
+      selectedSub.type === 'embedded'
+        ? `/api/videos/${currentVideo.id}/subtitles/${selectedSub.id}`
+        : `/api/videos/${currentVideo.id}/external-subs/${selectedSub.id}`;
+
+    const codec = selectedSub.codec || '';
+    const isAss =
+      codec.toLowerCase().includes('ass') ||
+      codec.toLowerCase().includes('ssa') ||
+      selectedSub.name.toLowerCase().endsWith('.ass');
+
+    if (isAss) {
+      if (videoRef.current && canvasRef.current) {
+        try {
+          jassubInstanceRef.current = new (JASSUB as any)({
+            video: videoRef.current,
+            canvas: canvasRef.current,
+            subUrl: subUrl,
+            workerUrl: '/jassub/jassub-worker.js',
+          });
+        } catch (err) {
+          console.error('Failed to initialize JASSUB:', err);
+        }
+      }
+    } else {
+      fetch(subUrl)
+        .then((res) => res.text())
+        .then((text) => {
+          const format = selectedSub.name.toLowerCase().endsWith('.vtt') ? 'vtt' : 'srt';
+          const parsedCues = parseSubtitle(text, format);
+          setCues(parsedCues);
+        })
+        .catch((err) => console.error('Failed to load text subtitle:', err));
+    }
+
+    return () => {
+      if (jassubInstanceRef.current) {
+        jassubInstanceRef.current.destroy();
+        jassubInstanceRef.current = null;
+      }
+    };
+  }, [selectedSubtitleId, subtitles, currentVideo]);
 
   if (!currentVideo) return null;
 
-  const videoSrc = `/api/videos/${currentVideo.id}/stream`;
+  const videoSrc =
+    audioTracks.length > 1
+      ? `/api/videos/${currentVideo.id}/stream?audioTrack=${selectedAudioIndex}`
+      : `/api/videos/${currentVideo.id}/stream`;
 
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
-      const savedTime = getPlaybackHistory(currentVideo.id);
-      if (savedTime && savedTime < videoRef.current.duration) {
-        videoRef.current.currentTime = savedTime;
+      
+      if (targetSeekTime !== null) {
+        videoRef.current.currentTime = targetSeekTime;
+        setTargetSeekTime(null);
+        if (isPlaying) {
+          videoRef.current.play().catch((err) => console.log('Autoplay error', err));
+        }
+      } else {
+        const savedTime = getPlaybackHistory(currentVideo.id);
+        if (savedTime && savedTime < videoRef.current.duration) {
+          videoRef.current.currentTime = savedTime;
+        }
       }
     }
   };
@@ -162,6 +271,20 @@ export default function VideoPlayer() {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const handleSelectAudio = (index: number) => {
+    if (videoRef.current) {
+      const curTime = videoRef.current.currentTime;
+      setTargetSeekTime(curTime);
+      setSelectedAudioIndex(index);
+      
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.load();
+        }
+      }, 50);
+    }
+  };
+
   return (
     <div ref={containerRef} className={styles.container}>
       <div className={styles.videoWrapper} onClick={handleVideoTap}>
@@ -176,6 +299,10 @@ export default function VideoPlayer() {
           onPause={() => setIsPlaying(false)}
         />
         
+        <canvas ref={canvasRef} className={styles.canvas} />
+
+        <SubtitleOverlay currentTime={currentTime} cues={cues} />
+
         {feedbackText && (
           <div className={styles.feedback}>
             {feedbackText}
@@ -243,6 +370,14 @@ export default function VideoPlayer() {
 
               <div className={styles.controlsGroup}>
                 <button
+                  aria-label="settings"
+                  className={styles.iconButton}
+                  onClick={() => setShowSettings(true)}
+                >
+                  <Settings size={24} />
+                </button>
+
+                <button
                   aria-label="fullscreen"
                   className={styles.iconButton}
                   onClick={toggleFullscreen}
@@ -253,6 +388,18 @@ export default function VideoPlayer() {
             </div>
           </div>
         </div>
+      )}
+
+      {showSettings && (
+        <TrackSelector
+          subtitles={subtitles}
+          selectedSubtitleId={selectedSubtitleId}
+          audioTracks={audioTracks}
+          selectedAudioIndex={selectedAudioIndex}
+          onSelectSubtitle={(sub) => setSelectedSubtitleId(sub.id)}
+          onSelectAudio={handleSelectAudio}
+          onClose={() => setShowSettings(false)}
+        />
       )}
     </div>
   );

@@ -6,6 +6,9 @@ import videoRoutes from './videoRoutes.js';
 import * as fileScanner from '../services/fileScanner.js';
 import * as videoStreamer from '../services/videoStreamer.js';
 import * as config from '../config/index.js';
+import ffmpeg from 'fluent-ffmpeg';
+
+vi.mock('fluent-ffmpeg');
 
 describe('Video Routes Integration', () => {
   let testApp: express.Application;
@@ -70,6 +73,41 @@ describe('Video Routes Integration', () => {
     expect(actualResolved).toBe(resolvedExpected);
   });
 
+  it('GET /api/videos/:id/stream with ?audioTrack should remux and stream', async () => {
+    vi.spyOn(config, 'getConfig').mockReturnValue({ videoDir: '/videos', subtitleDir: '', port: 3000 });
+
+    const mockPipe = vi.fn().mockImplementation((res) => {
+      res.write('mock remuxed stream');
+      res.end();
+    });
+
+    const mockFfmpegInstance = {
+      outputOptions: vi.fn().mockReturnThis(),
+      on: vi.fn().mockReturnThis(),
+      pipe: mockPipe,
+    };
+
+    vi.mocked(ffmpeg).mockReturnValue(mockFfmpegInstance as any);
+
+    const relativePath = 'v1.mp4';
+    const id = Buffer.from(relativePath, 'utf8').toString('base64url');
+
+    const response = await request(testApp)
+      .get(`/api/videos/${id}/stream?audioTrack=1`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.toString()).toBe('mock remuxed stream');
+    expect(ffmpeg).toHaveBeenCalledWith(expect.stringContaining('v1.mp4'));
+    expect(mockFfmpegInstance.outputOptions).toHaveBeenCalledWith(expect.arrayContaining([
+      '-map 0:v:0',
+      '-map 0:1',
+      '-c:v copy',
+      '-c:a aac',
+      '-movflags empty_moov+default_base_moof+frag_keyframe',
+      '-f mp4'
+    ]));
+  });
+
   it('GET /api/videos/:id/stream should return 400 if videoDir is empty', async () => {
     vi.spyOn(config, 'getConfig').mockReturnValue({ videoDir: '', subtitleDir: '', port: 3000 });
 
@@ -79,11 +117,9 @@ describe('Video Routes Integration', () => {
   });
 
   it('GET /api/videos/:id/stream should return 403 if directory traversal is detected', async () => {
-    // Set a base dir
     const baseDir = path.resolve('/videos');
     vi.spyOn(config, 'getConfig').mockReturnValue({ videoDir: baseDir, subtitleDir: '', port: 3000 });
 
-    // Relative path that goes outside /videos
     const relativePath = '../forbidden/file.mp4';
     const id = Buffer.from(relativePath, 'utf8').toString('base64url');
 
