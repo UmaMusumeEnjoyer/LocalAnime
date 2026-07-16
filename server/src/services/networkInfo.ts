@@ -3,29 +3,64 @@ import qrcode from 'qrcode';
 
 export function getLocalIp(): string {
   const interfaces = os.networkInterfaces();
-  let fallbackIp: string | null = null;
+  
+  const physicalAddresses: string[] = [];
+  const otherAddresses: string[] = [];
 
   for (const interfaceName of Object.keys(interfaces)) {
     const addresses = interfaces[interfaceName];
     if (!addresses) continue;
 
+    const lowerName = interfaceName.toLowerCase();
+    const isVirtual = 
+      lowerName.includes('virtual') || 
+      lowerName.includes('vethernet') || 
+      lowerName.includes('docker') || 
+      lowerName.includes('wsl') || 
+      lowerName.includes('vpn') || 
+      lowerName.includes('host-only') ||
+      lowerName.includes('hyper-v');
+
     for (const addr of addresses) {
       if (addr.family === 'IPv4' && !addr.internal) {
-        if (
-          addr.address.startsWith('192.168.') ||
-          addr.address.startsWith('10.') ||
-          addr.address.startsWith('172.')
-        ) {
-          return addr.address;
-        }
-        if (!fallbackIp) {
-          fallbackIp = addr.address;
+        if (isVirtual) {
+          otherAddresses.push(addr.address);
+        } else {
+          physicalAddresses.push(addr.address);
         }
       }
     }
   }
 
-  return fallbackIp || '127.0.0.1';
+  // First search in physical addresses for standard LAN classes
+  for (const ip of physicalAddresses) {
+    if (
+      ip.startsWith('192.168.') ||
+      ip.startsWith('10.') ||
+      ip.startsWith('172.')
+    ) {
+      return ip;
+    }
+  }
+
+  // Fallback to any physical address
+  if (physicalAddresses.length > 0) {
+    return physicalAddresses[0];
+  }
+
+  // Fallback to virtual/VPN addresses that match standard LAN classes
+  for (const ip of otherAddresses) {
+    if (
+      ip.startsWith('192.168.') ||
+      ip.startsWith('10.') ||
+      ip.startsWith('172.')
+    ) {
+      return ip;
+    }
+  }
+
+  // Last resort fallbacks
+  return otherAddresses[0] || '127.0.0.1';
 }
 
 export async function generateQrCodeDataUrl(url: string): Promise<string> {

@@ -45,3 +45,7 @@ server/temp/
 PROJECT_PLAN.md
 implementation_plan.md
 
+# Local configurations
+config.json
+
+

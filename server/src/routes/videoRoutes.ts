@@ -107,7 +107,10 @@ router.get('/network', async (req, res) => {
   try {
     const config = getConfig();
     const localIp = getLocalIp();
-    const port = config.port;
+    
+    // Check if running in development mode
+    const isDev = process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test' && !import.meta.url.includes('/dist/');
+    const port = isDev ? 5173 : (config.port || 3000);
     const url = `http://${localIp}:${port}`;
     const qrCodeDataUrl = await generateQrCodeDataUrl(url);
     
