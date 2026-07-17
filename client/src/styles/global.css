@@ -5,6 +5,7 @@ body {
   color: var(--text-primary);
   font-family: var(--font-sans);
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
 }
 

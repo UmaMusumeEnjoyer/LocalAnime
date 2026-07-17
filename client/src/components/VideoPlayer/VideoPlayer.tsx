@@ -50,33 +50,40 @@ export default function VideoPlayer() {
   const controlsTimeoutRef = useRef<number | null>(null);
 
   // ─── Controls auto-hide ───────────────────────────────
-  useEffect(() => {
-    const resetControlsTimeout = () => {
-      if (controlsTimeoutRef.current) {
-        window.clearTimeout(controlsTimeoutRef.current);
+  const resetControlsTimeout = useCallback(() => {
+    if (controlsTimeoutRef.current) {
+      window.clearTimeout(controlsTimeoutRef.current);
+    }
+    controlsTimeoutRef.current = window.setTimeout(() => {
+      if (isPlaying && !showSettings) {
+        setShowControls(false);
       }
-      setShowControls(true);
-      controlsTimeoutRef.current = window.setTimeout(() => {
-        if (isPlaying && !showSettings) {
-          setShowControls(false);
-        }
-      }, 3000);
-    };
+    }, 3000);
+  }, [isPlaying, showSettings]);
 
-    const handleMouseMove = () => {
+  useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse') return;
+      setShowControls(true);
       resetControlsTimeout();
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    resetControlsTimeout();
+    window.addEventListener('pointermove', handlePointerMove);
+    return () => window.removeEventListener('pointermove', handlePointerMove);
+  }, [resetControlsTimeout]);
 
+  useEffect(() => {
+    if (showControls) {
+      resetControlsTimeout();
+    } else if (controlsTimeoutRef.current) {
+      window.clearTimeout(controlsTimeoutRef.current);
+    }
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
       if (controlsTimeoutRef.current) {
         window.clearTimeout(controlsTimeoutRef.current);
       }
     };
-  }, [isPlaying, showSettings]);
+  }, [showControls, isPlaying, showSettings, resetControlsTimeout]);
 
   // ─── Fullscreen change listener ───────────────────────
   useEffect(() => {
@@ -422,9 +429,9 @@ export default function VideoPlayer() {
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300;
 
-    setShowControls(true);
-
     if (now - lastTap.current.time < DOUBLE_TAP_DELAY) {
+      setShowControls(true);
+
       const rect = e.currentTarget.getBoundingClientRect();
       const tapX = e.clientX - rect.left;
       const width = rect.width;
@@ -440,6 +447,8 @@ export default function VideoPlayer() {
           showFeedback('⏩ +10s');
         }
       }
+    } else {
+      setShowControls((prev) => !prev);
     }
 
     lastTap.current = { time: now };
