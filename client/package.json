@@ -12,7 +12,6 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "jassub": "^2.3.2",
     "lucide-react": "^0.470.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

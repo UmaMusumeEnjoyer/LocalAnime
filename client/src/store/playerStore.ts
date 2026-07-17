@@ -23,16 +23,10 @@ export const usePlayerStore = create<PlayerState>()(
 
       setCurrentVideo: (currentVideo) => set({ currentVideo }),
 
-      updatePlaybackHistory: (videoId, position) =>
-        set((state) => ({
-          playbackHistory: {
-            ...state.playbackHistory,
-            [videoId]: position,
-          },
-        })),
+      updatePlaybackHistory: () => {},
 
-      getPlaybackHistory: (videoId) => {
-        return get().playbackHistory[videoId] || 0;
+      getPlaybackHistory: () => {
+        return 0;
       },
     }),
     {

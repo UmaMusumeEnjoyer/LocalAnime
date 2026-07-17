@@ -2,7 +2,6 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { usePlayerStore } from '../../store/playerStore.ts';
 import styles from './VideoPlayer.module.css';
 import { Play, Pause, ArrowLeft, Maximize, Minimize, Volume2, VolumeX, Settings, RotateCcw, RotateCw } from 'lucide-react';
-import JASSUB from 'jassub';
 import { parseSubtitle } from '../../services/subtitleParser.ts';
 import type { SubtitleCue } from '../../services/subtitleParser.ts';
 import SubtitleOverlay from './SubtitleOverlay.tsx';
@@ -20,8 +19,6 @@ export default function VideoPlayer() {
   const { videos, currentVideo, setCurrentVideo, updatePlaybackHistory, getPlaybackHistory } = usePlayerStore();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const jassubInstanceRef = useRef<any>(null);
   const seekBarRef = useRef<HTMLDivElement | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -188,11 +185,6 @@ export default function VideoPlayer() {
   // ─── Subtitle rendering (JASSUB / text) ───────────────
   useEffect(() => {
     if (!currentVideo) return;
-
-    if (jassubInstanceRef.current) {
-      jassubInstanceRef.current.destroy();
-      jassubInstanceRef.current = null;
-    }
     setCues([]);
 
     if (selectedSubtitleId === 'none') {
@@ -207,61 +199,28 @@ export default function VideoPlayer() {
         ? `/api/videos/${currentVideo.id}/subtitles/${selectedSub.id}`
         : `/api/videos/${currentVideo.id}/external-subs/${selectedSub.id}`;
 
-    const codec = selectedSub.codec || '';
-    const isAss =
-      codec.toLowerCase().includes('ass') ||
-      codec.toLowerCase().includes('ssa') ||
-      selectedSub.name.toLowerCase().endsWith('.ass');
-
-    if (isAss) {
-      if (videoRef.current && canvasRef.current) {
-        try {
-          jassubInstanceRef.current = new (JASSUB as any)({
-            video: videoRef.current,
-            canvas: canvasRef.current,
-            subUrl: subUrl,
-            timeOffset: serverSeekOffset + offset,
-          });
-        } catch (err) {
-          console.error('Failed to initialize JASSUB:', err);
+    // Vì Backend đã convert ASS thành VTT, chúng ta chỉ cần fetch text và parse
+    fetch(subUrl)
+      .then((res) => res.text())
+      .then((text) => {
+        const subCodec = selectedSub.codec?.toLowerCase() || '';
+        let format: 'srt' | 'vtt' = 'srt';
+        if (
+          subCodec.includes('webvtt') ||
+          subCodec.includes('vtt') ||
+          selectedSub.name.toLowerCase().endsWith('.vtt') ||
+          subCodec.includes('ass') || // Embedded ASS tracks are now VTT
+          subCodec.includes('ssa') ||
+          selectedSub.name.toLowerCase().endsWith('.ass')
+        ) {
+          format = 'vtt';
         }
-      }
-    } else {
-      fetch(subUrl)
-        .then((res) => {
-          return res.text();
-        })
-        .then((text) => {
-          console.log('[DEBUG] Fetched subtitle text, length:', text.length);
-          const subCodec = selectedSub.codec?.toLowerCase() || '';
-          let format: 'srt' | 'vtt' = 'srt';
-          if (subCodec.includes('webvtt') || subCodec.includes('vtt') || selectedSub.name.toLowerCase().endsWith('.vtt')) {
-            format = 'vtt';
-          }
-          console.log('[DEBUG] Determined subtitle format:', format, 'from codec:', subCodec, 'and name:', selectedSub.name);
-          const parsedCues = parseSubtitle(text, format);
-          console.log('[DEBUG] Parsed subtitle cues count:', parsedCues.length);
-          if (parsedCues.length > 0) {
-             console.log('[DEBUG] First cue:', parsedCues[0]);
-          }
-          setCues(parsedCues);
-        })
-        .catch((err) => console.error('[DEBUG] Failed to load text subtitle:', err));
-    }
+        const parsedCues = parseSubtitle(text, format);
+        setCues(parsedCues);
+      })
+      .catch((err) => console.error('Failed to load text subtitle:', err));
+  }, [currentVideo, selectedSubtitleId, serverSeekOffset, offset]);
 
-    return () => {
-      if (jassubInstanceRef.current) {
-        jassubInstanceRef.current.destroy();
-        jassubInstanceRef.current = null;
-      }
-    };
-  }, [selectedSubtitleId, subtitles, currentVideo, serverSeekOffset]);
-
-  useEffect(() => {
-    if (jassubInstanceRef.current) {
-      jassubInstanceRef.current.timeOffset = serverSeekOffset + offset;
-    }
-  }, [offset, serverSeekOffset]);
 
   if (!currentVideo) return null;
 
@@ -563,12 +522,6 @@ export default function VideoPlayer() {
             // We do NOT change playIntentRef on native pause, because it might be a buffering pause
           }}
           onEnded={handleEnded}
-        />
-
-        <canvas 
-          key={`${currentVideo.id}-${selectedSubtitleId}-${serverSeekOffset}`} 
-          ref={canvasRef} 
-          className={styles.canvas} 
         />
 
         {isBuffering && (

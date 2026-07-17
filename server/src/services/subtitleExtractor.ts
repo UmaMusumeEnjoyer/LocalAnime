@@ -54,8 +54,8 @@ export async function extractEmbeddedSubtitle(
   videoId: string
 ): Promise<string> {
   const tempDir = path.join(process.cwd(), 'temp');
-  const isAss = codec.toLowerCase().includes('ass') || codec.toLowerCase().includes('ssa');
-  const ext = isAss ? 'ass' : codec.toLowerCase().includes('vtt') ? 'vtt' : 'srt';
+  // Luôn luôn xuất ra file .vtt để Frontend hiển thị mượt mà trên mọi thiết bị
+  const ext = 'vtt';
   const outputFilename = `${videoId}_${streamIndex}.${ext}`;
   const outputPath = path.join(tempDir, outputFilename);
 
