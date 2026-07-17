@@ -25,6 +25,8 @@ export default function VideoPlayer() {
   const seekBarRef = useRef<HTMLDivElement | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const playIntentRef = useRef(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
@@ -193,7 +195,9 @@ export default function VideoPlayer() {
     }
     setCues([]);
 
-    if (selectedSubtitleId === 'none') return;
+    if (selectedSubtitleId === 'none') {
+      return;
+    }
 
     const selectedSub = subtitles.find((s) => s.id === selectedSubtitleId);
     if (!selectedSub) return;
@@ -216,24 +220,33 @@ export default function VideoPlayer() {
             video: videoRef.current,
             canvas: canvasRef.current,
             subUrl: subUrl,
-            workerUrl: '/jassub/jassub-worker.js',
+            timeOffset: serverSeekOffset + offset,
           });
-          if (offset !== 0) {
-            jassubInstanceRef.current.setDelay(offset);
-          }
         } catch (err) {
           console.error('Failed to initialize JASSUB:', err);
         }
       }
     } else {
       fetch(subUrl)
-        .then((res) => res.text())
+        .then((res) => {
+          return res.text();
+        })
         .then((text) => {
-          const format = selectedSub.name.toLowerCase().endsWith('.vtt') ? 'vtt' : 'srt';
+          console.log('[DEBUG] Fetched subtitle text, length:', text.length);
+          const subCodec = selectedSub.codec?.toLowerCase() || '';
+          let format: 'srt' | 'vtt' = 'srt';
+          if (subCodec.includes('webvtt') || subCodec.includes('vtt') || selectedSub.name.toLowerCase().endsWith('.vtt')) {
+            format = 'vtt';
+          }
+          console.log('[DEBUG] Determined subtitle format:', format, 'from codec:', subCodec, 'and name:', selectedSub.name);
           const parsedCues = parseSubtitle(text, format);
+          console.log('[DEBUG] Parsed subtitle cues count:', parsedCues.length);
+          if (parsedCues.length > 0) {
+             console.log('[DEBUG] First cue:', parsedCues[0]);
+          }
           setCues(parsedCues);
         })
-        .catch((err) => console.error('Failed to load text subtitle:', err));
+        .catch((err) => console.error('[DEBUG] Failed to load text subtitle:', err));
     }
 
     return () => {
@@ -242,13 +255,13 @@ export default function VideoPlayer() {
         jassubInstanceRef.current = null;
       }
     };
-  }, [selectedSubtitleId, subtitles, currentVideo]);
+  }, [selectedSubtitleId, subtitles, currentVideo, serverSeekOffset]);
 
   useEffect(() => {
     if (jassubInstanceRef.current) {
-      jassubInstanceRef.current.setDelay(offset);
+      jassubInstanceRef.current.timeOffset = serverSeekOffset + offset;
     }
-  }, [offset]);
+  }, [offset, serverSeekOffset]);
 
   if (!currentVideo) return null;
 
@@ -284,11 +297,13 @@ export default function VideoPlayer() {
   const togglePlay = () => {
     if (videoRef.current) {
       if (isPlaying) {
+        playIntentRef.current = false;
         videoRef.current.pause();
       } else {
+        playIntentRef.current = true;
         videoRef.current.play().catch((err) => console.log('Autoplay error', err));
       }
-      setIsPlaying(!isPlaying);
+      // Note: isPlaying state is updated by onPlay/onPause events
     }
   };
 
@@ -334,6 +349,12 @@ export default function VideoPlayer() {
     (e: TouchEvent | MouseEvent) => {
       if (!isSeeking) return;
       const time = getSeekTimeFromEvent(e);
+      
+      setIsBuffering(true);
+      if (videoRef.current) {
+        videoRef.current.pause(); // Đóng băng mọi hoạt động ngay khi bắt đầu tải source mới
+      }
+
       setServerSeekOffset(time);
       setIsSeeking(false);
       setSeekPreviewTime(null);
@@ -517,12 +538,44 @@ export default function VideoPlayer() {
           playsInline
           onLoadedMetadata={handleLoadedMetadata}
           onTimeUpdate={handleTimeUpdate}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
+          onWaiting={() => {
+            setIsBuffering(true);
+            if (videoRef.current) videoRef.current.pause();
+          }}
+          onCanPlay={() => {
+            setIsBuffering(false);
+            // Chỉ resume play nếu người dùng đang có ý định play
+            if (playIntentRef.current && videoRef.current) {
+              videoRef.current.play().catch(console.error);
+            }
+          }}
+          onPlaying={() => {
+            setIsBuffering(false);
+            setIsPlaying(true);
+            playIntentRef.current = true;
+          }}
+          onPlay={() => {
+            setIsPlaying(true);
+            playIntentRef.current = true;
+          }}
+          onPause={() => {
+            setIsPlaying(false);
+            // We do NOT change playIntentRef on native pause, because it might be a buffering pause
+          }}
           onEnded={handleEnded}
         />
 
-        <canvas ref={canvasRef} className={styles.canvas} />
+        <canvas 
+          key={`${currentVideo.id}-${selectedSubtitleId}-${serverSeekOffset}`} 
+          ref={canvasRef} 
+          className={styles.canvas} 
+        />
+
+        {isBuffering && (
+          <div className={styles.spinnerContainer}>
+            <div className={styles.spinner}></div>
+          </div>
+        )}
 
         <SubtitleOverlay currentTime={currentTime} cues={cues} offset={offset} />
 

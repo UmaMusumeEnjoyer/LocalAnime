@@ -114,7 +114,7 @@ router.get('/videos/:id/stream', async (req, res) => {
        
        if (videoStream) {
           const compatibleCodecs = ['h264', 'vp8', 'vp9', 'av1'];
-          if (!compatibleCodecs.includes(videoStream.codec_name || '')) {
+          if (!compatibleCodecs.includes(videoStream.codec_name || '') || start > 0) {
              vCodec = 'libx264';
              needsFfmpeg = true;
           }
