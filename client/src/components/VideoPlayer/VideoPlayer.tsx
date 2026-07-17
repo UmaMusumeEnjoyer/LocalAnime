@@ -39,7 +39,7 @@ export default function VideoPlayer() {
   const [selectedAudioIndex, setSelectedAudioIndex] = useState<number>(1);
   const [showSettings, setShowSettings] = useState(false);
   const [cues, setCues] = useState<SubtitleCue[]>([]);
-  const [targetSeekTime, setTargetSeekTime] = useState<number | null>(null);
+  const [serverSeekOffset, setServerSeekOffset] = useState<number>(0);
 
   // Custom seek bar state
   const [isSeeking, setIsSeeking] = useState(false);
@@ -115,9 +115,27 @@ export default function VideoPlayer() {
     };
   }, []);
 
-  // ─── Fetch subtitles & auto-select default ────────────
+  // ─── Fetch subtitles, info & auto-select default ────────────
   useEffect(() => {
     if (!currentVideo) return;
+
+    const savedTime = getPlaybackHistory(currentVideo.id);
+    if (savedTime && savedTime > 0) {
+      setServerSeekOffset(savedTime);
+      setCurrentTime(savedTime);
+    } else {
+      setServerSeekOffset(0);
+      setCurrentTime(0);
+    }
+
+    fetch(`/api/videos/${currentVideo.id}/info`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.duration) {
+          setDuration(parseFloat(data.duration));
+        }
+      })
+      .catch((err) => console.error('Error fetching info:', err));
 
     fetch(`/api/videos/${currentVideo.id}/subtitles`)
       .then((res) => res.json())
@@ -236,34 +254,28 @@ export default function VideoPlayer() {
 
   const videoSrc =
     audioTracks.length > 1
-      ? `/api/videos/${currentVideo.id}/stream?audioTrack=${selectedAudioIndex}`
-      : `/api/videos/${currentVideo.id}/stream`;
+      ? `/api/videos/${currentVideo.id}/stream?audioTrack=${selectedAudioIndex}&start=${serverSeekOffset}`
+      : `/api/videos/${currentVideo.id}/stream?start=${serverSeekOffset}`;
 
   // ─── Video event handlers ─────────────────────────────
 
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
-      setDuration(videoRef.current.duration);
-
-      if (targetSeekTime !== null) {
-        videoRef.current.currentTime = targetSeekTime;
-        setTargetSeekTime(null);
-        if (isPlaying) {
-          videoRef.current.play().catch((err) => console.log('Autoplay error', err));
-        }
+      if (!duration || duration === 0) {
+         setDuration(videoRef.current.duration);
+      }
+      
+      if (isPlaying || (serverSeekOffset > 0 && currentTime > 0)) {
+         videoRef.current.play().catch((err) => console.log('Autoplay error', err));
       } else {
-        const savedTime = getPlaybackHistory(currentVideo.id);
-        if (savedTime && savedTime < videoRef.current.duration) {
-          videoRef.current.currentTime = savedTime;
-        }
-        videoRef.current.play().catch((err) => console.log('Autoplay error', err));
+         videoRef.current.play().catch((err) => console.log('Autoplay error', err));
       }
     }
   };
 
   const handleTimeUpdate = () => {
     if (videoRef.current && !isSeeking) {
-      const curTime = videoRef.current.currentTime;
+      const curTime = serverSeekOffset + videoRef.current.currentTime;
       setCurrentTime(curTime);
       updatePlaybackHistory(currentVideo.id, curTime);
     }
@@ -322,10 +334,7 @@ export default function VideoPlayer() {
     (e: TouchEvent | MouseEvent) => {
       if (!isSeeking) return;
       const time = getSeekTimeFromEvent(e);
-      if (videoRef.current) {
-        videoRef.current.currentTime = time;
-      }
-      setCurrentTime(time);
+      setServerSeekOffset(time);
       setIsSeeking(false);
       setSeekPreviewTime(null);
     },
@@ -420,9 +429,8 @@ export default function VideoPlayer() {
 
   const handleSkip = (seconds: number) => {
     if (videoRef.current) {
-      const newTime = Math.max(0, Math.min(videoRef.current.duration || 0, videoRef.current.currentTime + seconds));
-      videoRef.current.currentTime = newTime;
-      setCurrentTime(newTime);
+      const newTime = Math.max(0, Math.min(duration || 0, currentTime + seconds));
+      setServerSeekOffset(newTime);
       const sign = seconds > 0 ? '+' : '';
       showFeedback(`${sign}${seconds}s`);
     }
@@ -443,10 +451,12 @@ export default function VideoPlayer() {
 
       if (videoRef.current) {
         if (tapX < width / 2) {
-          videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+          const newTime = Math.max(0, currentTime - 10);
+          setServerSeekOffset(newTime);
           showFeedback('⏪ -10s');
         } else {
-          videoRef.current.currentTime = Math.min(videoRef.current.duration || 0, videoRef.current.currentTime + 10);
+          const newTime = Math.min(duration || 0, currentTime + 10);
+          setServerSeekOffset(newTime);
           showFeedback('⏩ +10s');
         }
       }
@@ -477,15 +487,8 @@ export default function VideoPlayer() {
 
   const handleSelectAudio = (index: number) => {
     if (videoRef.current) {
-      const curTime = videoRef.current.currentTime;
-      setTargetSeekTime(curTime);
       setSelectedAudioIndex(index);
-
-      setTimeout(() => {
-        if (videoRef.current) {
-          videoRef.current.load();
-        }
-      }, 50);
+      setServerSeekOffset(currentTime);
     }
   };
 

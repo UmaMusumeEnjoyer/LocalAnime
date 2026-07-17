@@ -23,7 +23,16 @@ router.get('/videos', async (req, res) => {
   }
 });
 
-router.get('/videos/:id/stream', (req, res) => {
+function probeVideo(filePath: string): Promise<ffmpeg.FfprobeData> {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(filePath, (err, data) => {
+      if (err) reject(err);
+      else resolve(data);
+    });
+  });
+}
+
+router.get('/videos/:id/info', async (req, res) => {
   try {
     const { id } = req.params;
     if (!id) {
@@ -46,23 +55,124 @@ router.get('/videos/:id/stream', (req, res) => {
       return;
     }
 
-    if (req.query.audioTrack) {
-      const audioTrackIndex = parseInt(req.query.audioTrack as string, 10);
+    const probeData = await probeVideo(absolutePath);
+    res.json({
+      duration: probeData.format.duration,
+      format: probeData.format.format_name,
+      streams: probeData.streams.map(s => ({
+        index: s.index,
+        codec_type: s.codec_type,
+        codec_name: s.codec_name,
+      })),
+    });
+  } catch (err) {
+    console.error('Error in GET /videos/:id/info', err);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+router.get('/videos/:id/stream', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      res.status(400).send('Missing video ID');
+      return;
+    }
+
+    const config = getConfig();
+    if (!config.videoDir) {
+      res.status(400).send('Video directory not configured');
+      return;
+    }
+
+    const relativePath = Buffer.from(id, 'base64url').toString('utf8');
+    const absolutePath = path.resolve(config.videoDir, relativePath);
+
+    const resolvedVideoDir = path.resolve(config.videoDir);
+    if (!absolutePath.startsWith(resolvedVideoDir)) {
+      res.status(403).send('Forbidden: Directory traversal detected');
+      return;
+    }
+
+    const start = req.query.start ? parseFloat(req.query.start as string) : 0;
+    const ext = path.extname(absolutePath).toLowerCase();
+    
+    let needsFfmpeg = false;
+    let vCodec = 'copy';
+    let aCodec = 'aac';
+    
+    if (ext === '.mkv' || start > 0 || req.query.audioTrack) {
+       needsFfmpeg = true;
+    }
+
+    let probeData: ffmpeg.FfprobeData | null = null;
+    
+    try {
+       probeData = await probeVideo(absolutePath);
+       const videoStream = probeData.streams.find(s => s.codec_type === 'video');
+       const audioStream = probeData.streams.find(s => s.codec_type === 'audio');
+       
+       if (videoStream) {
+          const compatibleCodecs = ['h264', 'vp8', 'vp9', 'av1'];
+          if (!compatibleCodecs.includes(videoStream.codec_name || '')) {
+             vCodec = 'libx264';
+             needsFfmpeg = true;
+          }
+       }
+       
+       if (audioStream) {
+          const compatibleAudio = ['aac', 'mp3', 'opus', 'vorbis'];
+          if (compatibleAudio.includes(audioStream.codec_name || '')) {
+             aCodec = 'copy';
+          } else {
+             aCodec = 'aac';
+             needsFfmpeg = true;
+          }
+       }
+    } catch (e) {
+       console.error("Failed to probe video:", e);
+    }
+
+    if (needsFfmpeg) {
+      const audioTrackIndex = req.query.audioTrack ? parseInt(req.query.audioTrack as string, 10) : undefined;
+      
+      let mapAudio = '';
+      if (audioTrackIndex !== undefined) {
+         mapAudio = `-map 0:${audioTrackIndex}`;
+      } else {
+         const aStream = probeData?.streams.find(s => s.codec_type === 'audio');
+         if (aStream) {
+            mapAudio = `-map 0:${aStream.index}`;
+         } else {
+            mapAudio = `-map 0:a:0?`;
+         }
+      }
       
       res.writeHead(200, {
         'Content-Type': 'video/mp4',
         'Connection': 'keep-alive',
       });
 
-      const command = ffmpeg(absolutePath)
-        .outputOptions([
-          '-map 0:v:0',
-          `-map 0:${audioTrackIndex}`,
-          '-c:v copy',
-          '-c:a aac',
-          '-movflags empty_moov+default_base_moof+frag_keyframe',
-          '-f mp4'
-        ]);
+      const outputOptions = [
+        '-map 0:v:0',
+        mapAudio,
+        `-c:v ${vCodec}`,
+        `-c:a ${aCodec}`,
+        '-movflags empty_moov+default_base_moof+frag_keyframe',
+        '-f mp4'
+      ];
+
+      if (vCodec === 'libx264') {
+         outputOptions.push('-preset ultrafast', '-crf 23');
+      }
+
+      const command = ffmpeg(absolutePath);
+      
+      if (start > 0) {
+         command.inputOptions([`-ss ${start}`]);
+      }
+      
+      command.outputOptions(outputOptions);
 
       command.on('error', (err) => {
         if (err.message && err.message.includes('Output stream closed')) {

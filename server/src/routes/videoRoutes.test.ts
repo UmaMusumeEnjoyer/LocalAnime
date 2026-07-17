@@ -22,6 +22,16 @@ describe('Video Routes Integration', () => {
     testApp = express();
     testApp.use(express.json());
     testApp.use('/api', videoRoutes);
+
+    vi.spyOn(ffmpeg, 'ffprobe').mockImplementation((_path, callback) => {
+      callback(null, {
+        format: { duration: 100, format_name: 'matroska' },
+        streams: [
+          { index: 0, codec_type: 'video', codec_name: 'h264' },
+          { index: 1, codec_type: 'audio', codec_name: 'aac' }
+        ]
+      } as any);
+    });
   });
 
   it('GET /api/videos should return list of scanned videos', async () => {
@@ -106,7 +116,7 @@ describe('Video Routes Integration', () => {
       '-map 0:v:0',
       '-map 0:1',
       '-c:v copy',
-      '-c:a aac',
+      '-c:a copy',
       '-movflags empty_moov+default_base_moof+frag_keyframe',
       '-f mp4'
     ]));
