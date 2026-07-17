@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import styles from './TrackSelector.module.css';
-import { X, Check } from 'lucide-react';
+import { X, Check, ChevronRight } from 'lucide-react';
 import SubtitleTimingControl from './SubtitleTimingControl.tsx';
+import SubtitleSettingsMenu from './SubtitleSettingsMenu.tsx';
+import SubtitleOptionPicker from './SubtitleOptionPicker.tsx';
 
 export interface SubtitleOption {
   id: string;
@@ -42,6 +45,40 @@ export default function TrackSelector({
   onAdjustOffset,
   onResetOffset,
 }: TrackSelectorProps) {
+  const [activeView, setActiveView] = useState<'main' | 'subtitle_settings' | 'option_picker'>('main');
+  const [selectedOptionId, setSelectedOptionId] = useState<string>('');
+
+  if (activeView === 'subtitle_settings') {
+    return (
+      <div className={styles.backdrop} onClick={onClose}>
+        <div className={styles.bottomSheet} onClick={(e) => e.stopPropagation()}>
+          <SubtitleSettingsMenu
+            onBack={() => setActiveView('main')}
+            onClose={onClose}
+            onSelectOption={(optionId) => {
+              setSelectedOptionId(optionId);
+              setActiveView('option_picker');
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (activeView === 'option_picker') {
+    return (
+      <div className={styles.backdrop} onClick={onClose}>
+        <div className={styles.bottomSheet} onClick={(e) => e.stopPropagation()}>
+          <SubtitleOptionPicker
+            optionId={selectedOptionId}
+            onBack={() => setActiveView('subtitle_settings')}
+            onClose={onClose}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.backdrop} onClick={onClose}>
       <div className={styles.bottomSheet} onClick={(e) => e.stopPropagation()}>
@@ -53,6 +90,19 @@ export default function TrackSelector({
         </header>
 
         <div className={styles.content}>
+          <section className={styles.section}>
+            <h4 className={styles.sectionTitle}>Hiển Thị</h4>
+            <div className={styles.list}>
+              <button
+                className={styles.item}
+                onClick={() => setActiveView('subtitle_settings')}
+              >
+                <span className={styles.itemName}>Cài đặt hiển thị phụ đề</span>
+                <ChevronRight size={18} className={styles.chevronIcon} />
+              </button>
+            </div>
+          </section>
+
           <section className={styles.section}>
             <h4 className={styles.sectionTitle}>Chọn Phụ Đề</h4>
             <div className={styles.list}>

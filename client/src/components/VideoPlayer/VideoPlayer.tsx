@@ -554,8 +554,70 @@ export default function VideoPlayer() {
           </div>
 
           <div className={styles.bottomBar}>
+            <div className={styles.controlsGroup}>
+              <button
+                aria-label="play-pause"
+                className={styles.iconButton}
+                onClick={togglePlay}
+              >
+                {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+              </button>
+
+              <button
+                aria-label="rewind-10"
+                className={styles.skipButton}
+                onClick={() => handleSkip(-10)}
+              >
+                <RotateCcw size={22} />
+                <span className={styles.skipLabel}>10</span>
+              </button>
+              <button
+                aria-label="rewind-5"
+                className={styles.skipButton}
+                onClick={() => handleSkip(-5)}
+              >
+                <RotateCcw size={20} />
+                <span className={styles.skipLabel}>5</span>
+              </button>
+              <button
+                aria-label="forward-5"
+                className={styles.skipButton}
+                onClick={() => handleSkip(5)}
+              >
+                <RotateCw size={20} />
+                <span className={styles.skipLabel}>5</span>
+              </button>
+              <button
+                aria-label="forward-10"
+                className={styles.skipButton}
+                onClick={() => handleSkip(10)}
+              >
+                <RotateCw size={22} />
+                <span className={styles.skipLabel}>10</span>
+              </button>
+
+              <div className={styles.volumeContainer}>
+                <button
+                  aria-label="mute"
+                  className={styles.iconButton}
+                  onClick={toggleMute}
+                >
+                  {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                </button>
+                <input
+                  type="range"
+                  className={styles.volumeBar}
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={isMuted ? 0 : volume}
+                  onChange={handleVolumeChange}
+                />
+              </div>
+            </div>
+
             {/* Custom Seek Bar */}
-            <div className={styles.progressRow}>
+            <div className={styles.progressRowContainer}>
               <span className={styles.timeLabel}>{formatTime(currentTime)}</span>
 
               <div
@@ -588,88 +650,22 @@ export default function VideoPlayer() {
               <span className={styles.timeLabel}>{formatTime(duration)}</span>
             </div>
 
-            {/* Controls Row */}
-            <div className={styles.controlsRow}>
-              <div className={styles.controlsGroup}>
-                <button
-                  aria-label="play-pause"
-                  className={styles.iconButton}
-                  onClick={togglePlay}
-                >
-                  {isPlaying ? <Pause size={24} /> : <Play size={24} />}
-                </button>
+            <div className={styles.controlsGroup}>
+              <button
+                aria-label="settings"
+                className={styles.iconButton}
+                onClick={() => setShowSettings(true)}
+              >
+                <Settings size={24} />
+              </button>
 
-                {/* Skip buttons: -10s, -5s, +5s, +10s */}
-                <button
-                  aria-label="rewind-10"
-                  className={styles.skipButton}
-                  onClick={() => handleSkip(-10)}
-                >
-                  <RotateCcw size={22} />
-                  <span className={styles.skipLabel}>10</span>
-                </button>
-                <button
-                  aria-label="rewind-5"
-                  className={styles.skipButton}
-                  onClick={() => handleSkip(-5)}
-                >
-                  <RotateCcw size={20} />
-                  <span className={styles.skipLabel}>5</span>
-                </button>
-                <button
-                  aria-label="forward-5"
-                  className={styles.skipButton}
-                  onClick={() => handleSkip(5)}
-                >
-                  <RotateCw size={20} />
-                  <span className={styles.skipLabel}>5</span>
-                </button>
-                <button
-                  aria-label="forward-10"
-                  className={styles.skipButton}
-                  onClick={() => handleSkip(10)}
-                >
-                  <RotateCw size={22} />
-                  <span className={styles.skipLabel}>10</span>
-                </button>
-
-                <div className={styles.volumeContainer}>
-                  <button
-                    aria-label="mute"
-                    className={styles.iconButton}
-                    onClick={toggleMute}
-                  >
-                    {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
-                  </button>
-                  <input
-                    type="range"
-                    className={styles.volumeBar}
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    value={isMuted ? 0 : volume}
-                    onChange={handleVolumeChange}
-                  />
-                </div>
-              </div>
-
-              <div className={styles.controlsGroup}>
-                <button
-                  aria-label="settings"
-                  className={styles.iconButton}
-                  onClick={() => setShowSettings(true)}
-                >
-                  <Settings size={24} />
-                </button>
-
-                <button
-                  aria-label="fullscreen"
-                  className={styles.iconButton}
-                  onClick={toggleFullscreen}
-                >
-                  {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
-                </button>
-              </div>
+              <button
+                aria-label="fullscreen"
+                className={styles.iconButton}
+                onClick={toggleFullscreen}
+              >
+                {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
+              </button>
             </div>
           </div>
         </div>

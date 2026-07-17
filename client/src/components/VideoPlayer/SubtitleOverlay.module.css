@@ -1,6 +1,6 @@
 .container {
   position: absolute;
-  bottom: 80px;
+  bottom: max(5%, 24px);
   left: 50%;
   transform: translateX(-50%);
   width: 90%;
@@ -12,7 +12,6 @@
 }
 
 .textWrapper {
-  background-color: rgba(0, 0, 0, 0.4);
   padding: 6px 16px;
   border-radius: 8px;
   text-align: center;
@@ -20,21 +19,17 @@
 
 .line {
   margin: 0;
-  font-size: 1.25rem;
   font-weight: 700;
-  color: #fff;
-  text-shadow: 
-    1px 1px 0 #000, 
-    -1px -1px 0 #000, 
-    1px -1px 0 #000, 
-    -1px 1px 0 #000,
-    0 2px 4px rgba(0, 0, 0, 0.8);
   line-height: 1.4;
   word-break: break-word;
+  font-size: calc(1.25rem * var(--font-scale, 1));
 }
 
 @media (min-width: 640px) {
+  .container {
+    bottom: max(5%, 32px);
+  }
   .line {
-    font-size: 1.5rem;
+    font-size: calc(1.5rem * var(--font-scale, 1));
   }
 }

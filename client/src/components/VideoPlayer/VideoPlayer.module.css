@@ -104,8 +104,9 @@
 
 .bottomBar {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
   width: 100%;
   background: var(--bg-glass);
   backdrop-filter: blur(10px);
@@ -117,10 +118,11 @@
 
 /* ========== Custom Seek Bar ========== */
 
-.progressRow {
+.progressRowContainer {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-grow: 1;
 }
 
 .timeLabel {
@@ -362,7 +364,7 @@
     padding-top: calc(10px + env(safe-area-inset-top, 0px));
   }
 
-  .progressRow {
+  .progressRowContainer {
     gap: 8px;
   }
 

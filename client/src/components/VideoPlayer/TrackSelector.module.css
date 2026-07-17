@@ -19,11 +19,11 @@
   backdrop-filter: blur(20px);
   border-top: 1px solid var(--border);
   border-radius: 20px 20px 0 0;
-  padding: 24px;
+  padding: min(4vh, 24px);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  max-height: 80vh;
+  max-height: 85vh;
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   overflow-y: auto;
 }
@@ -32,7 +32,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: min(3vh, 20px);
   flex-shrink: 0;
 }
 
@@ -63,16 +63,37 @@
   color: var(--accent-primary);
 }
 
+.backButton {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+  outline: none;
+  margin-right: 8px;
+}
+
+.backButton:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--accent-primary);
+}
+
 .content {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: min(3vh, 24px);
 }
 
 .section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: min(1.5vh, 12px);
 }
 
 .sectionTitle {
@@ -88,14 +109,14 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: min(1vh, 8px);
 }
 
 .item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 48px;
+  height: max(36px, min(6vh, 48px));
   padding: 0 16px;
   background-color: var(--bg-surface);
   border: 1px solid var(--border);
@@ -130,6 +151,17 @@
 .checkIcon {
   color: var(--accent-primary);
   margin-left: 12px;
+  flex-shrink: 0;
+}
+
+.valueLabel {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-right: 8px;
+}
+
+.chevronIcon {
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
